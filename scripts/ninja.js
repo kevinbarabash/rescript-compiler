@@ -976,7 +976,7 @@ ${ninjaQuickBuidList([
   ],
   [
     ["js.cmj", "js.cmi"],
-    "js.ml",
+    "js.res",
     "cc",
     ninjaCwd,
     [["bsc_flags", "$bsc_primitive_flags"]],
@@ -1007,11 +1007,11 @@ ${ninjaQuickBuidList([
   var jsPrefixSourceFiles = othersDirFiles.filter(
     (x) =>
       x.startsWith("js") &&
-      (x.endsWith(".ml") || x.endsWith(".mli")) &&
+      (x.endsWith(".ml") || x.endsWith(".mli") || x.endsWith(".res") || x.endsWith(".resi")) &&
       !x.includes(".cppo") &&
       !x.includes(".pp") &&
       !x.includes("#") &&
-      x !== "js.ml"
+      x !== "js.res"
   );
   var othersFiles = othersDirFiles.filter(
     (x) =>
@@ -1019,7 +1019,7 @@ ${ninjaQuickBuidList([
       x !== "belt.ml" &&
       x !== "belt_internals.mli" &&
       x !== "node.ml" &&
-      (x.endsWith(".ml") || x.endsWith(".mli")) &&
+      (x.endsWith(".ml") || x.endsWith(".mli") || x.endsWith(".res") || x.endsWith(".resi")) &&
       !x.includes("#") &&
       !x.includes(".cppo") // we have node ..
   );
@@ -1032,6 +1032,7 @@ ${ninjaQuickBuidList([
     ocamlDepForBscAsync(othersFiles, othersDir, depsMap),
   ]);
   var jsOutput = generateNinja(jsDepsMap, jsTargets, ninjaCwd, externalDeps);
+  // TODO: ensure that js_string(2).cmi appears before js_json.cm(j|i)
   jsOutput.push(phony(js_package, fileTargets(allJsTargets), ninjaCwd));
 
   // Note compiling belt.ml still try to read
