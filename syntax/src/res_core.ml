@@ -14,6 +14,16 @@ let mkLoc startLoc endLoc = Location.{
   loc_ghost = false;
 }
 
+let filter_map (f : 'a -> 'b option) xs =
+  let rec aux acc = function
+  | [] -> List.rev acc
+  | y :: ys -> (
+    match f y with
+    | None -> aux acc ys
+    | Some z -> aux (z :: acc) ys
+  )
+  in aux [] xs
+
 module Recover = struct
   let defaultExpr () =
     let id = Location.mknoloc "rescript.exprhole" in
@@ -137,6 +147,7 @@ let ifLetAttr = (Location.mknoloc "ns.iflet", Parsetree.PStr [])
 let suppressFragileMatchWarningAttr = (Location.mknoloc "warning", Parsetree.PStr [Ast_helper.Str.eval (Ast_helper.Exp.constant (Pconst_string ("-4", None)))])
 let makeBracesAttr loc = (Location.mkloc "ns.braces" loc, Parsetree.PStr [])
 let templateLiteralAttr = (Location.mknoloc "res.template", Parsetree.PStr [])
+let taggedTemplateLiteralAttr = (Location.mknoloc "res.taggedTemplate", Parsetree.PStr [])
 
 type stringLiteralState =
   | Start
@@ -2217,59 +2228,87 @@ and parseBinaryExpr ?(context=OrdinaryExpr) ?a p prec =
   (* ) *)
 
 and parseTemplateExpr ?(prefix="js") p =
+  let partPrefix = match prefix with
+    | "js" | "j" -> Some(prefix)
+    | _ -> None 
+  in
+  let startPos = p.Parser.startPos in
+
+  let parseParts p =
+    let rec aux acc =
+      let startPos = p.Parser.startPos in
+      Parser.nextTemplateLiteralToken p;
+      match p.token with
+      | TemplateTail txt ->
+        Parser.next p;
+        let loc = mkLoc startPos p.prevEndPos in
+        let txt = if p.mode = ParseForTypeChecker then parseTemplateStringLiteral txt else txt in
+        let str = Ast_helper.Exp.constant ~attrs:[templateLiteralAttr] ~loc (Pconst_string(txt, partPrefix)) in
+        List.rev ((str, None) :: acc)
+      | TemplatePart txt ->
+        Parser.next p;
+        let loc = mkLoc startPos p.prevEndPos in
+        let expr = parseExprBlock p in
+        let txt = if p.mode = ParseForTypeChecker then parseTemplateStringLiteral txt else txt in
+        let str = Ast_helper.Exp.constant ~attrs:[templateLiteralAttr] ~loc (Pconst_string(txt, partPrefix)) in
+        aux ((str, Some(expr)) :: acc)
+    | token ->
+      Parser.err p (Diagnostics.unexpected token p.breadcrumbs);
+      []
+    in aux []
+  in
+  let parts = parseParts p in
+  let strings = List.map fst parts in
+  let values = filter_map snd parts in
+  let endPos = p.Parser.endPos in
+
+  let genTaggedTemplateCall () =
+    let lident = Longident.Lident prefix in
+    let ident = Ast_helper.Exp.ident ~attrs:[] ~loc:Location.none (Location.mknoloc lident) in
+    let strings_array = Ast_helper.Exp.array ~attrs:[] ~loc:Location.none strings in
+    let values_array = Ast_helper.Exp.array ~attrs:[] ~loc:Location.none values in
+    Ast_helper.Exp.apply
+      ~attrs:[taggedTemplateLiteralAttr]
+      ~loc:(mkLoc startPos endPos)
+      ident [(Nolabel, strings_array); (Nolabel, values_array)]
+  in
+
   let hiddenOperator =
     let op = Location.mknoloc (Longident.Lident "^") in
     Ast_helper.Exp.ident op
   in
-  let rec parseParts acc =
-    let startPos = p.Parser.startPos in
-    Parser.nextTemplateLiteralToken p;
-    match p.token with
-    | TemplateTail txt ->
-      Parser.next p;
-      let loc = mkLoc startPos p.prevEndPos in
-      let txt = if p.mode = ParseForTypeChecker then parseTemplateStringLiteral txt else txt in
-      let str = Ast_helper.Exp.constant ~attrs:[templateLiteralAttr] ~loc (Pconst_string(txt, Some prefix)) in
-      Ast_helper.Exp.apply ~attrs:[templateLiteralAttr] ~loc hiddenOperator
-        [Nolabel, acc; Nolabel, str]
-    | TemplatePart txt ->
-      Parser.next p;
-      let loc = mkLoc startPos p.prevEndPos in
-      let expr = parseExprBlock p in
-      let fullLoc = mkLoc startPos p.prevEndPos in
-      let txt = if p.mode = ParseForTypeChecker then parseTemplateStringLiteral txt else txt in
-      let str = Ast_helper.Exp.constant ~attrs:[templateLiteralAttr] ~loc (Pconst_string(txt, Some prefix)) in
-      let next =
-        let a = Ast_helper.Exp.apply ~attrs:[templateLiteralAttr] ~loc:fullLoc hiddenOperator [Nolabel, acc; Nolabel, str] in
-        Ast_helper.Exp.apply ~loc:fullLoc hiddenOperator
-          [Nolabel, a; Nolabel, expr]
-      in
-      parseParts next
-   | token ->
-     Parser.err p (Diagnostics.unexpected token p.breadcrumbs);
-     Ast_helper.Exp.constant (Pconst_string("", None))
-  in
-  let startPos = p.startPos in
-  Parser.nextTemplateLiteralToken p;
-  match p.token with
-  | TemplateTail txt ->
-    Parser.next p;
-    let txt = if p.mode = ParseForTypeChecker then parseTemplateStringLiteral txt else txt in
-    Ast_helper.Exp.constant ~attrs:[templateLiteralAttr] ~loc:(mkLoc startPos p.prevEndPos) (Pconst_string(txt, Some prefix))
-  | TemplatePart txt ->
-    Parser.next p;
-    let constantLoc = mkLoc startPos p.prevEndPos in
-    let expr = parseExprBlock p in
-    let fullLoc = mkLoc startPos p.prevEndPos in
-    let txt = if p.mode = ParseForTypeChecker then parseTemplateStringLiteral txt else txt in
-    let str = Ast_helper.Exp.constant ~attrs:[templateLiteralAttr] ~loc:constantLoc (Pconst_string(txt, Some prefix)) in
-    let next =
-      Ast_helper.Exp.apply ~attrs:[templateLiteralAttr] ~loc:fullLoc hiddenOperator [Nolabel, str; Nolabel, expr]
+  let genInterpolatedString () =
+    let subparts = List.flatten (
+      List.map (fun part -> 
+        match part with
+        | (s, Some(v)) -> [s; v]
+        | (s, None) -> [s]
+      ) 
+      parts)
     in
-    parseParts next
- | token ->
-   Parser.err p (Diagnostics.unexpected token p.breadcrumbs);
-   Ast_helper.Exp.constant (Pconst_string("", None))
+    let exprOption = List.fold_left (
+      fun acc subpart -> 
+        Some(
+          match acc with
+          | Some(expr) ->
+            let loc = (mkLoc
+              (expr.Parsetree.pexp_loc.Location.loc_start)
+              (subpart.Parsetree.pexp_loc.Location.loc_end)
+            ) in
+            Ast_helper.Exp.apply
+              ~attrs:[templateLiteralAttr] ~loc hiddenOperator [Nolabel, expr; Nolabel, subpart]
+          | None -> subpart
+        )
+      )
+      None subparts
+    in match exprOption with
+    | Some(expr) -> expr
+    | None -> Ast_helper.Exp.constant (Pconst_string("", None))
+  in
+
+  match prefix with
+  | "js" | "j" -> genInterpolatedString ()
+  | _ -> genTaggedTemplateCall ()
 
 (* Overparse: let f = a : int => a + 1, is it (a : int) => or (a): int =>
  * Also overparse constraints:

@@ -1999,11 +1999,12 @@ and printValueBinding ~recFlag vb cmtTbl i =
             pexp_desc = Pexp_ifthenelse (ifExpr, _, _)
           }  ->
           ParsetreeViewer.isBinaryExpression ifExpr || ParsetreeViewer.hasAttributes ifExpr.pexp_attributes
-      | { pexp_desc = Pexp_newtype _} -> false
-      | e ->
-          ParsetreeViewer.hasAttributes e.pexp_attributes ||
-          ParsetreeViewer.isArrayAccess e
-        )
+        | { pexp_desc = Pexp_newtype _} -> false
+        | { pexp_attributes = [({Location.txt="res.taggedTemplate"}, _)] } -> false
+        | e ->
+            ParsetreeViewer.hasAttributes e.pexp_attributes ||
+            ParsetreeViewer.isArrayAccess e
+          )
     in
     Doc.group (
       Doc.concat [
@@ -2853,11 +2854,13 @@ and printExpression (e : Parsetree.expression) cmtTbl =
     | extension ->
       printExtension ~atModuleLvl:false extension cmtTbl
     end
-  | Pexp_apply _ ->
+  | Pexp_apply (callExpr, args) ->
     if ParsetreeViewer.isUnaryExpression e then
       printUnaryExpression e cmtTbl
     else if ParsetreeViewer.isTemplateLiteral e then
       printTemplateLiteral e cmtTbl
+    else if ParsetreeViewer.isTaggedTemplateLiteral e then
+      printTaggedTemplateLiteral callExpr args cmtTbl
     else if ParsetreeViewer.isBinaryExpression e then
       printBinaryExpression e cmtTbl
     else
@@ -3397,6 +3400,49 @@ and printTemplateLiteral expr cmtTbl =
     Doc.text "`";
     content;
     Doc.text "`"
+  ]
+
+and printTaggedTemplateLiteral callExpr args cmtTbl =
+  let (stringsList, valuesList) = match args with
+  | [
+    (_, {Parsetree.pexp_desc = Pexp_array strings});
+    (_, {Parsetree.pexp_desc = Pexp_array values})
+  ] -> (strings, values)
+  | _ -> assert false
+  in
+
+  let strings = List.map (
+    fun x -> match x with
+    | {Parsetree.pexp_desc = Pexp_constant (Pconst_string (txt, _))} -> 
+      printStringContents txt
+    | _ -> assert false
+  ) stringsList in
+
+  let values = List.map (fun x -> 
+    Doc.concat [
+      Doc.text "${";
+      printExpressionWithComments x cmtTbl;
+      Doc.text "}"
+    ]) valuesList in
+
+  let process strings values = 
+    let rec aux acc = function
+      | [], [] -> acc
+      | a_head :: a_rest, b -> 
+        aux (Doc.concat [acc; a_head]) (b, a_rest)
+      | _ -> assert false
+    in
+    aux Doc.nil (strings, values) 
+  in
+
+  let content: Doc.t = process strings values in
+
+  let tag = printExpressionWithComments callExpr cmtTbl in
+  Doc.concat [
+    tag;
+    Doc.text "`";
+    content;
+    Doc.text "`";
   ]
 
 and printUnaryExpression expr cmtTbl =
