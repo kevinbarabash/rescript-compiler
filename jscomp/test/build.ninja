@@ -582,7 +582,7 @@ o test/stringmatch_test.cmi test/stringmatch_test.cmj : cc test/stringmatch_test
 o test/submodule.cmi test/submodule.cmj : cc test/submodule.ml | $bsc $stdlib runtime
 o test/submodule_call.cmi test/submodule_call.cmj : cc test/submodule_call.ml | test/submodule.cmj $bsc $stdlib runtime
 o test/switch_case_test.cmi test/switch_case_test.cmj : cc test/switch_case_test.ml | test/mt.cmj $bsc $stdlib runtime
-o test/tagged_template_test.cmi test/tagged_template_test.cmj : cc test/tagged_template_test.res | $bsc $stdlib runtime
+o test/tagged_template_test.cmi test/tagged_template_test.cmj : cc test/tagged_template_test.res | test/mt.cmj $bsc $stdlib runtime
 o test/tailcall_inline_test.cmi test/tailcall_inline_test.cmj : cc test/tailcall_inline_test.ml | test/mt.cmj $bsc $stdlib runtime
 o test/test.cmi test/test.cmj : cc test/test.ml | $bsc $stdlib runtime
 o test/test2.cmi test/test2.cmj : cc test/test2.ml | $bsc $stdlib runtime

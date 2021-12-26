@@ -120,6 +120,7 @@ and expression_desc =
       some primitive  call is translated
       into a plain call, it's better to keep them
   *)
+  | TaggedTemplate of expression * expression list * expression list
   | String_index of expression * expression
   (* str.[i])*)
   | Array_index of expression * expression
