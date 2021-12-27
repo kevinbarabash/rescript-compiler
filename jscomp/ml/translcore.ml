@@ -721,10 +721,13 @@ and transl_exp0 (e : Typedtree.expression) : Lambda.lambda =
       let wrap f =
         if args' = [] then f
         else
-          let inlined, _ =
+          let inlined, funct =
             Translattribute.get_and_remove_inlined_attribute funct
           in
-          transl_apply ~inlined f args' e.exp_loc
+          let isTaggedTemplate, _ =
+            Translattribute.get_and_remove_tagged_template_attribute funct
+          in 
+          transl_apply ~inlined ~isTaggedTemplate f args' e.exp_loc
       in
       let args =
         List.map (function _, Some x -> x | _ -> assert false) args
@@ -756,10 +759,27 @@ and transl_exp0 (e : Typedtree.expression) : Lambda.lambda =
               wrap (Lprim (prim, argl, e.exp_loc))
               ))
   | Texp_apply (funct, oargs) ->
+      (* let () = print_string "#2 attrs = " in *)
+      (* let () = (
+        List.iter (
+          function ({txt = attrName}, _) -> print_string (attrName ^ "\n")
+        ) e.exp_attributes
+      ) in
+      let isTaggedTemplate = List.exists (
+        function ({txt = attrName}, _) -> attrName = "res.taggedTemplate"
+      ) e.exp_attributes in
+      let () = if isTaggedTemplate then
+        (print_string "isTaggedTemplate\n")
+      else 
+        (print_string "not isTaggedTemplate\n")
+      in *)
       let inlined, funct =
         Translattribute.get_and_remove_inlined_attribute funct
       in
-      transl_apply ~inlined (transl_exp funct) oargs e.exp_loc
+      let isTaggedTemplate, _ =
+        Translattribute.get_and_remove_tagged_template_attribute e
+      in
+      transl_apply ~inlined ~isTaggedTemplate (transl_exp funct) oargs e.exp_loc
   | Texp_match (arg, pat_expr_list, exn_pat_expr_list, partial) ->
       transl_match e arg pat_expr_list exn_pat_expr_list partial
   | Texp_try (body, pat_expr_list) ->
@@ -948,14 +968,19 @@ and transl_cases_try cases =
   in
   List.map transl_case_try cases
 
-and transl_apply ?(inlined = Default_inline) lam sargs loc =
+and transl_apply ?(inlined = Default_inline) ?(isTaggedTemplate = false) lam sargs loc =
   let lapply funct args =
     match funct with
     (* Attention: This may not be what we need to change the application arity*)
     | Lapply ap -> Lapply { ap with ap_args = ap.ap_args @ args; ap_loc = loc }
     | lexp ->
-        Lapply
-          { ap_loc = loc; ap_func = lexp; ap_args = args; ap_inlined = inlined }
+        Lapply {
+            ap_loc = loc;
+            ap_func = lexp;
+            ap_args = args;
+            ap_inlined = inlined;
+            ap_tagged_template = isTaggedTemplate;
+        }
   in
   let rec build_apply lam args = function
     | (None, optional) :: l ->

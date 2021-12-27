@@ -344,8 +344,9 @@ let rec lam ppf = function
   | Lapply ap ->
       let lams ppf largs =
         List.iter (fun l -> fprintf ppf "@ %a" lam l) largs in
-      fprintf ppf "@[<2>(apply@ %a%a%a)@]" lam ap.ap_func lams ap.ap_args
+      fprintf ppf "@[<2>(apply@ %a%a%a%s)@]" lam ap.ap_func lams ap.ap_args
         apply_inlined_attribute ap.ap_inlined
+        (match ap.ap_tagged_template with true -> "%tagged_template" | _ -> "")
 
   | Lfunction{ params; body; attr} ->
       let pr_params ppf params =
