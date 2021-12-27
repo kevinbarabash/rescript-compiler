@@ -74,6 +74,9 @@ let call ?comment ~info e0 args : t =
 let flat_call ?comment e0 es : t =
   { expression_desc = FlatCall (e0, es); comment }
 
+let tagged_template ?comment e0 stringArgs valueArgs : t =
+  { expression_desc = TaggedTemplate (e0, stringArgs, valueArgs); comment }
+
 let runtime_var_dot ?comment (x : string) (e1 : string) : J.expression =
   {
     expression_desc =

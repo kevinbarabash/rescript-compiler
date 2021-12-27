@@ -50,6 +50,7 @@ type t =
       arg_types : External_arg_spec.params;
       ffi : External_ffi_types.external_spec;
     }
+  | Pjs_tagged_template of { prim_name : string }
   | Pjs_object_create of External_arg_spec.obj_params
   (* Exceptions *)
   | Praise
@@ -257,6 +258,11 @@ let eq_primitive_approx (lhs : t) (rhs : t) =
   | Pjs_object_create obj_create -> (
       match rhs with
       | Pjs_object_create obj_create1 -> obj_create = obj_create1
+      | _ -> false)
+  | Pjs_tagged_template { prim_name } -> (
+      match rhs with
+      | Pjs_tagged_template rhs ->
+          prim_name = rhs.prim_name
       | _ -> false)
   | Pintcomp comparison -> (
       match rhs with

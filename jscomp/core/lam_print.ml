@@ -93,6 +93,7 @@ let primitive ppf (prim : Lam_primitive.t) =
   | Plazyforce -> fprintf ppf "force"
   | Pccall p -> fprintf ppf "%s" p.prim_name
   | Pjs_call { prim_name } -> fprintf ppf "%s[js]" prim_name
+  | Pjs_tagged_template { prim_name } -> fprintf ppf "%s[js.tagged_template]" prim_name
   | Pjs_object_create _ -> fprintf ppf "[js.obj]"
   | Praise -> fprintf ppf "raise"
   | Psequand -> fprintf ppf "&&"

@@ -284,6 +284,16 @@ let translate loc (cxt : Lam_compile_context.t) (prim : Lam_primitive.t)
   | Pjs_object_create _ -> assert false
   | Pjs_call { arg_types; ffi } ->
       Lam_compile_external_call.translate_ffi cxt arg_types ffi args
+  | Pjs_tagged_template _ -> (
+      match args with
+      (* TODO: make sure that we're creating the lambda so that the args match *)
+      | [ callExpr; stringArgs; valueArgs ] -> (
+          match (stringArgs, valueArgs) with
+          | ({expression_desc = Array (strings, _)}, {expression_desc = Array (values, _)}) ->
+            E.tagged_template callExpr strings values
+          | _ -> assert false
+          )
+      | _ -> assert false)
   (* FIXME, this can be removed later *)
   | Pisint -> E.is_type_number (Ext_list.singleton_exn args)
   | Pis_poly_var_block -> E.is_type_object (Ext_list.singleton_exn args)
