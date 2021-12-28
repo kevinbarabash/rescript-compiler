@@ -15,7 +15,7 @@ var table = "users";
 
 var id = "5";
 
-var query = Tagged_template_libJs.sql`SELECT * FROM table WHERE id = id`;
+var query = Tagged_template_libJs.sql`SELECT * FROM ${table} WHERE id = ${id}`;
 
 Mt.from_pair_suites("tagged template", {
       hd: [

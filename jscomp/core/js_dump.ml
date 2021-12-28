@@ -594,7 +594,11 @@ and expression_desc cxt ~(level : int) f x : cxt =
       | {J.expression_desc = Str (_, str)} ->
         P.string f str;
         cxt
-      | _ -> expression cxt ~level f x_head
+      | _ -> 
+        P.string f "${";
+        let cxt = expression cxt ~level f x_head in
+        P.string f "}";
+        cxt
       )
       in
       aux cxt ys x_rest
