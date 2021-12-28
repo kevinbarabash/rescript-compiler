@@ -284,13 +284,18 @@ let translate loc (cxt : Lam_compile_context.t) (prim : Lam_primitive.t)
   | Pjs_object_create _ -> assert false
   | Pjs_call { arg_types; ffi } ->
       Lam_compile_external_call.translate_ffi cxt arg_types ffi args
-  | Pjs_tagged_template _ -> (
+  | Pjs_tagged_template { ffi } -> (
+      (* TODO: extract this into lam_compile_external_call.ml *)
+      let fn = match ffi with
+      | Js_call { external_module_name; name; scopes } ->
+        Lam_compile_external_call.translate_scoped_module_val external_module_name name scopes
+      | _ -> assert false
+      in
       match args with
-      (* TODO: make sure that we're creating the lambda so that the args match *)
-      | [ callExpr; stringArgs; valueArgs ] -> (
+      | [ stringArgs; valueArgs ] -> (
           match (stringArgs, valueArgs) with
           | ({expression_desc = Array (strings, _)}, {expression_desc = Array (values, _)}) ->
-            E.tagged_template callExpr strings values
+            E.tagged_template fn strings values
           | _ -> assert false
           )
       | _ -> assert false)

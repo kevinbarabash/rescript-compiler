@@ -190,7 +190,7 @@ let simplify_alias (meta : Lam_stats.t) (lam : Lam.t) : Lam.t =
                   Lam_closure.is_closed_with_map meta.export_idents params body
                 in
                 let is_export_id = Set_ident.mem meta.export_idents v in
-                match (is_export_id, param_map) with
+                let result = match (is_export_id, param_map) with
                 | false, (_, param_map) | true, (true, param_map) -> (
                     match rec_flag with
                     | Lam_rec ->
@@ -208,6 +208,18 @@ let simplify_alias (meta : Lam_stats.t) (lam : Lam.t) : Lam.t =
                             (Lam_beta_reduce.propogate_beta_reduce_with_map meta
                                param_map params body ap_args))
                 | _ -> normal ()
+                in
+                let result = (match result with
+                | Lprim {primitive; args; loc} -> (match primitive with
+                  (* Converts Pjs_calls to Pjs_tagged_templates if ap_tagged_template is true *)
+                  | Pjs_call {prim_name; ffi} when ap_info.ap_tagged_template ->
+                    let prim = Lam_primitive.Pjs_tagged_template {prim_name; ffi} in
+                    Lam.prim ~primitive:prim ~args loc
+                  | _ -> result
+                  )
+                | _ -> result)
+                in
+                result
               else normal ()
             else normal ()
         | Some _ | None -> normal ())
