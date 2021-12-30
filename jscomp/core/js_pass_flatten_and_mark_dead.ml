@@ -213,7 +213,8 @@ let subst_map (substitution : J.expression Hash_ident.t) =
                               | None -> Printf.sprintf "%d" i
                               | Some x -> x)
                           | Blk_record { fields } ->
-                              Ext_array.get_or fields i (fun _ ->
+                              let string_fields = Array.map Lambda.blk_record_field_to_string fields in
+                              Ext_array.get_or string_fields i (fun _ ->
                                   Printf.sprintf "%d" i)
                           | _ -> Printf.sprintf "%d" i)
                       in

@@ -83,7 +83,10 @@ let property_access f s =
 
 let property_key (s : J.property_name) : string =
   match s with
-  | Lit s ->
+  | Lit (s, false) ->
       if obj_property_no_need_quot s then s
       else Js_dump_string.escape_to_string s
+  | Lit (s, true) ->
+      (* No need to escape s since it's identifier *)
+      "[" ^ s ^ "]"
   | Symbol_name -> {|[Symbol.for("name")]|}

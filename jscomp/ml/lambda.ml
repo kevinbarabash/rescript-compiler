@@ -38,19 +38,27 @@ type record_repr =
   | Record_regular 
   | Record_object 
 
+type blk_record_field =
+  | Blk_record_field_string of string
+  | Blk_record_field_computed of Longident.t
+
+let blk_record_field_to_string = function
+  | Blk_record_field_string s -> s
+  | Blk_record_field_computed _ -> "Ident.t" (* TODO *)
+
 type tag_info = 
   | Blk_constructor of {name : string ; num_nonconst : int ; tag : int }
   | Blk_record_inlined of { name : string ; num_nonconst :  int;  tag : int; fields : string array; mutable_flag : Asttypes.mutable_flag }   
   | Blk_tuple
   | Blk_poly_var of string 
-  | Blk_record of {fields : string array; mutable_flag : Asttypes.mutable_flag; record_repr : record_repr}  
+  | Blk_record of {fields : blk_record_field array; mutable_flag : Asttypes.mutable_flag; record_repr : record_repr}  
   | Blk_module of string list
   | Blk_module_export of Ident.t list
 
   | Blk_extension  
   | Blk_some
   | Blk_some_not_nested (* ['a option] where ['a] can not inhabit a non-like value *)
-  | Blk_record_ext of { fields :  string array; mutable_flag : Asttypes.mutable_flag}
+  | Blk_record_ext of { fields : blk_record_field array; mutable_flag : Asttypes.mutable_flag}
   | Blk_lazy_general
 
 let tag_of_tag_info (tag : tag_info ) = 
@@ -92,7 +100,8 @@ let blk_record = ref (fun _ _ _ ->
 
 
 let blk_record_ext =  ref (fun fields mutable_flag -> 
-    let all_labels_info = fields |> Array.map (fun (x,_) -> x.Types.lbl_name) in    
+    let all_labels_info = fields
+      |> Array.map (fun (x,_) -> Blk_record_field_string x.Types.lbl_name) in    
     Blk_record_ext {fields = all_labels_info; mutable_flag }
   )
 
@@ -102,7 +111,11 @@ let blk_record_inlined = ref (fun fields name num_nonconst ~tag mutable_flag ->
 ) 
 
 let ref_tag_info : tag_info = 
-  Blk_record {fields = [| "contents" |]; mutable_flag = Mutable; record_repr = Record_regular}
+  Blk_record {
+    fields = [| Blk_record_field_string "contents" |];
+    mutable_flag = Mutable;
+    record_repr = Record_regular;
+  }
   
 type field_dbg_info = 
   | Fld_record of {name : string; mutable_flag : Asttypes.mutable_flag}
@@ -117,6 +130,7 @@ type field_dbg_info =
   | Fld_cons 
   | Fld_array
   
+(* used for field getters *)
 let fld_record = ref (fun (lbl : Types.label_description) ->
   Fld_record {name = lbl.lbl_name; mutable_flag = Mutable})
 
@@ -130,6 +144,8 @@ type set_field_dbg_info =
     | Fld_record_extension_set of string
 
 let ref_field_set_info : set_field_dbg_info = Fld_record_set "contents"    
+
+(* used for field setters *)
 let fld_record_set = ref ( fun (lbl : Types.label_description) ->
   Fld_record_set lbl.lbl_name  )
 

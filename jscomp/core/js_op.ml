@@ -117,7 +117,16 @@ type kind = Ml | Runtime | External of { name : string; default : bool }
 
 type property = Lam_compat.let_kind = Strict | Alias | StrictOpt | Variable
 
-type property_name = Lit of string | Symbol_name
+type property_name = Lit of (string * bool) | Symbol_name
+
+let rec string_of_ident = function
+  | Longident.Lident s -> s
+  | Longident.Ldot (ident, property) -> (string_of_ident ident) ^ "." ^ property
+  | Longident.Lapply (_, _) -> "" (* TODO: figure out what this should be *)
+
+let blk_record_field_to_property_name = function
+  | Lambda.Blk_record_field_string s -> Lit (s, false)
+  | Lambda.Blk_record_field_computed ident -> Lit (string_of_ident ident, true)
 
 type 'a access = Getter | Setter
 

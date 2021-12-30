@@ -107,18 +107,28 @@ let exn_block_as_obj ~(stack : bool) (el : J.expression list) (ext : J.tag_info)
   let field_name =
     match ext with
     | Blk_extension -> (
-        fun i ->
-          match i with 0 -> Literals.exception_id | i -> "_" ^ string_of_int i)
+        fun i -> (
+          match i with 
+          | 0 -> Js_op.Lit (Literals.exception_id, false)
+          | i -> Js_op.Lit ("_" ^ string_of_int i, false)
+        )
+      )
     | Blk_record_ext { fields = ss } -> (
-        fun i -> match i with 0 -> Literals.exception_id | i -> ss.(i - 1))
+        fun i -> (
+          match i with 
+          | 0 -> Js_op.Lit (Literals.exception_id, false)
+          | i -> Js_op.blk_record_field_to_property_name ss.(i - 1)
+            (* Js_op.Lit (Lambda.blk_record_field_to_string ss.(i - 1), false) *)
+        )
+      )
     | _ -> assert false
   in
   Object
     (if stack then
      Ext_list.mapi_append el
-       (fun i e -> (Js_op.Lit (field_name i), e))
-       [ (Js_op.Lit "Error", E.new_ (E.js_global "Error") []) ]
-    else Ext_list.mapi el (fun i e -> (Js_op.Lit (field_name i), e)))
+       (fun i e -> (field_name i, e))
+       [ (Js_op.Lit ("Error", false), E.new_ (E.js_global "Error") []) ]
+    else Ext_list.mapi el (fun i e -> (field_name i, e)))
 
 let rec iter_lst cxt (f : P.t) ls element inter =
   match ls with
@@ -708,22 +718,31 @@ and expression_desc cxt ~(level : int) f x : cxt =
       expression_desc cxt ~level f
         (Object
            (Ext_list.map_combine fields el (fun x ->
-                Js_op.Lit (Ext_ident.convert x))))
+                Js_op.Lit (Ext_ident.convert x, false))))
   (*name convention of Record is slight different from modules*)
   | Caml_block (el, mutable_flag, _, Blk_record { fields; record_repr }) -> (
-      if Ext_array.for_alli fields (fun i v -> string_of_int i = v) then
+      if Ext_array.for_alli fields (
+        fun i v -> string_of_int i = Lambda.blk_record_field_to_string v
+      ) then
         expression_desc cxt ~level f (Array (el, mutable_flag))
       else
         match record_repr with
         | Record_regular ->
             expression_desc cxt ~level f
-              (Object (Ext_list.combine_array fields el (fun i -> Js_op.Lit i)))
+              (Object
+                (Ext_list.combine_array fields el
+                  (fun i -> Js_op.blk_record_field_to_property_name i)
+                    (* Js_op.Lit (Lambda.blk_record_field_to_string i, false)) *)
+                )
+              )
         | Record_object ->
             let fields =
               Ext_list.array_list_filter_map fields el (fun f x ->
                   match x.expression_desc with
                   | Undefined -> None
-                  | _ -> Some (Js_op.Lit f, x))
+                  | _ -> Some (Js_op.blk_record_field_to_property_name f, x)
+                    (* Js_op.Lit (Lambda.blk_record_field_to_string f, false), x) *)
+              )
             in
             expression_desc cxt ~level f (Object fields))
   | Caml_block (el, _, _, Blk_poly_var _) -> (
@@ -732,8 +751,8 @@ and expression_desc cxt ~(level : int) f x : cxt =
           expression_desc cxt ~level f
             (Object
                [
-                 (Js_op.Lit Literals.polyvar_hash, tag);
-                 (Lit Literals.polyvar_value, value);
+                 (Js_op.Lit (Literals.polyvar_hash, false), tag);
+                 (Lit (Literals.polyvar_value, false), value);
                ])
       | _ -> assert false)
   | Caml_block (el, _, _, ((Blk_extension | Blk_record_ext _) as ext)) ->
@@ -743,11 +762,11 @@ and expression_desc cxt ~(level : int) f x : cxt =
         let tails =
           Ext_list.combine_array_append p.fields el
             (if !Js_config.debug then [ (name_symbol, E.str p.name) ] else [])
-            (fun i -> Js_op.Lit i)
+            (fun i -> Js_op.Lit (i, false))
         in
         if p.num_nonconst = 1 then tails
         else
-          ( Js_op.Lit L.tag,
+          ( Js_op.Lit (L.tag, false),
             if !Js_config.debug then tag else { tag with comment = Some p.name }
           )
           :: tails
@@ -762,9 +781,9 @@ and expression_desc cxt ~(level : int) f x : cxt =
           Ext_list.mapi_append el
             (fun i e ->
               ( (match (not_is_cons, i) with
-                | false, 0 -> Js_op.Lit Literals.hd
-                | false, 1 -> Js_op.Lit Literals.tl
-                | _ -> Js_op.Lit ("_" ^ string_of_int i)),
+                | false, 0 -> Js_op.Lit (Literals.hd, false)
+                | false, 1 -> Js_op.Lit (Literals.tl, false)
+                | _ -> Js_op.Lit ("_" ^ string_of_int i, false)),
                 e ))
             (if !Js_config.debug && not_is_cons then
              [ (name_symbol, E.str p.name) ]
@@ -772,7 +791,7 @@ and expression_desc cxt ~(level : int) f x : cxt =
         in
         if p.num_nonconst = 1 then tails
         else
-          ( Js_op.Lit L.tag,
+          ( Js_op.Lit (L.tag, false),
             if !Js_config.debug then tag else { tag with comment = Some p.name }
           )
           :: tails

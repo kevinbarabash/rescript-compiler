@@ -107,12 +107,14 @@ let str_of_field_info (fld_info : Lambda.field_dbg_info)=
   | Fld_array -> "[||]" 
 let print_taginfo ppf = function
   | Blk_extension -> fprintf ppf "ext" 
-  | Blk_record_ext {fields = ss} -> fprintf ppf "[%s]" (String.concat ";" (Array.to_list ss) )
+  | Blk_record_ext {fields = ss} ->
+    fprintf ppf "[%s]" (String.concat ";" (Array.to_list (Array.map Lambda.blk_record_field_to_string ss) ) )
   | Blk_tuple -> fprintf ppf "tuple"
   | Blk_constructor {name ;num_nonconst} -> fprintf ppf "%s/%i" name num_nonconst
   | Blk_poly_var name -> fprintf ppf "`%s" name 
-  | Blk_record  {fields = ss} ->  fprintf ppf "[%s]" (String.concat ";" (Array.to_list ss) )
-  | Blk_module ss ->  fprintf ppf "[%s]" (String.concat ";"  ss) 
+  | Blk_record  {fields = ss} -> 
+    fprintf ppf "[%s]" (String.concat ";" (Array.to_list (Array.map Lambda.blk_record_field_to_string ss) ) )
+  | Blk_module ss ->  fprintf ppf "[%s]" (String.concat ";"  ss)
   | Blk_some -> fprintf ppf "some"
   | Blk_some_not_nested -> fprintf ppf "some_not_nested" 
   | Blk_lazy_general -> fprintf ppf "lazy_general"

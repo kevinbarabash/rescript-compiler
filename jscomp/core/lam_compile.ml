@@ -364,7 +364,8 @@ and compile_recursive_let ~all_bindings (cxt : Lam_compile_context.t)
                  S.exp
                    (Js_of_lam_block.set_field
                       (match tag_info with
-                      | Blk_record { fields = xs } -> Fld_record_set xs.(i)
+                      | Blk_record { fields = xs } -> 
+                        Fld_record_set (Lambda.blk_record_field_to_string xs.(i))
                       | Blk_record_inlined xs ->
                           Fld_record_inline_set xs.fields.(i)
                       | Blk_constructor p -> (

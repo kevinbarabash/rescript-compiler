@@ -38,12 +38,18 @@ type record_repr =
   | Record_regular 
   | Record_object 
 
+type blk_record_field =
+| Blk_record_field_string of string
+| Blk_record_field_computed of Longident.t
+
+val blk_record_field_to_string: blk_record_field -> string
+
 type tag_info = 
   | Blk_constructor of {name : string ; num_nonconst : int; tag : int}
   | Blk_record_inlined of { name : string ; num_nonconst :  int ;  tag : int; fields : string array; mutable_flag : mutable_flag}   
   | Blk_tuple
   | Blk_poly_var of string 
-  | Blk_record of {fields : string array; mutable_flag : mutable_flag; record_repr : record_repr }
+  | Blk_record of {fields : blk_record_field array; mutable_flag : mutable_flag; record_repr : record_repr }
   | Blk_module of string list
   | Blk_module_export of Ident.t list 
   | Blk_extension
@@ -60,7 +66,7 @@ type tag_info =
 
   | Blk_some
   | Blk_some_not_nested (* ['a option] where ['a] can not inhabit a non-like value *)
-  | Blk_record_ext of {fields : string array; mutable_flag : mutable_flag}
+  | Blk_record_ext of {fields : blk_record_field array; mutable_flag : mutable_flag}
   | Blk_lazy_general    
 
 val tag_of_tag_info : tag_info -> int 

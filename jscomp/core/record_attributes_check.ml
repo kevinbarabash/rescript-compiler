@@ -51,6 +51,31 @@ let find_name_with_loc (attr : Parsetree.attribute) : string Asttypes.loc option
       Some { txt = s; loc }
   | _ -> None
 
+let find_name_as_blk_record_field (attr : Parsetree.attribute) =
+  match attr with
+  | ( { txt = "bs.as" | "as" },
+      PStr
+        [
+          {
+            pstr_desc =
+              Pstr_eval ({ pexp_desc = Pexp_constant (Pconst_string (s, _)) }, _);
+          };
+        ] ) ->
+      Some (Lambda.Blk_record_field_string s)
+  | ( { txt = "bs.as" | "as" },
+      PStr
+        [
+          {
+            pstr_desc =
+              Pstr_eval ({ pexp_desc = Pexp_ident { txt = ident} }, _);
+          };
+        ] ) ->
+      Some (Lambda.Blk_record_field_computed ident)
+  | ({ txt = "bs.as" | "as" }, PStr _) ->
+    (* TODO: report an error if @as has payload we don't understand *)
+    None
+  | _ -> None
+  
 let fld_record (lbl : label) =
   Lambda.Fld_record
     {
@@ -63,9 +88,15 @@ let fld_record_set (lbl : label) =
     (Ext_list.find_def lbl.lbl_attributes find_name lbl.lbl_name)
 
 let blk_record (fields : (label * _) array) mut record_repr =
+  (* TODO: create a variant of find_name that returns a blk_record_field instead *)
   let all_labels_info =
     Ext_array.map fields (fun (lbl, _) ->
-        Ext_list.find_def lbl.lbl_attributes find_name lbl.lbl_name)
+      (* we default to lbl_name if we can't find a suitable name in lbl_attributes *)
+        Ext_list.find_def 
+          lbl.lbl_attributes
+          find_name_as_blk_record_field
+          (Lambda.Blk_record_field_string lbl.lbl_name)
+    )
   in
   Lambda.Blk_record
     { fields = all_labels_info; mutable_flag = mut; record_repr }

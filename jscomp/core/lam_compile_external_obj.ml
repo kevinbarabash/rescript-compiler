@@ -50,7 +50,7 @@ let assemble_obj_args (labels : External_arg_spec.obj_params)
         :: labels,
         args ) ->
         let accs, eff, assign = aux labels args in
-        ( (Js_op.Lit label, Lam_compile_const.translate_arg_cst cst) :: accs,
+        ( (Js_op.Lit (label, false), Lam_compile_const.translate_arg_cst cst) :: accs,
           eff,
           assign )
     (* | {obj_arg_label = EmptyCst _ } :: rest  , args -> assert false  *)
@@ -69,7 +69,7 @@ let assemble_obj_args (labels : External_arg_spec.obj_params)
         match acc with
         | Splice2 _ | Splice0 -> assert false
         | Splice1 x ->
-            ((Js_op.Lit label, x) :: accs, Ext_list.append new_eff eff, assign)
+            ((Js_op.Lit (label, false), x) :: accs, Ext_list.append new_eff eff, assign)
         (* evaluation order is undefined *))
     | ( ({ obj_arg_label = Obj_optional { name = label }; obj_arg_type } as
         arg_kind)
@@ -85,7 +85,7 @@ let assemble_obj_args (labels : External_arg_spec.obj_params)
             match acc with
             | Splice2 _ | Splice0 -> assert false
             | Splice1 x ->
-                ( (Js_op.Lit label, x) :: accs,
+                ( (Js_op.Lit (label, false), x) :: accs,
                   Ext_list.append new_eff eff,
                   assign ))
           ~not_sure:(fun _ -> (accs, eff, (arg_kind, arg) :: assign))
